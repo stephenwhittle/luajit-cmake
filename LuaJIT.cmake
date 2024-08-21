@@ -426,13 +426,16 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
        ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
   DEPENDS ${LUAJIT_DIR}/src/luajit_rolling.h
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit_relver.txt
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
 )
 
 # Generate buildvm_arch.h
 add_custom_command(OUTPUT ${BUILDVM_ARCH_H}
   COMMAND ${HOST_WINE} ${MINILUA_PATH} ${DASM_PATH} ${DASM_FLAGS}
-          -o ${BUILDVM_ARCH_H} ${VM_DASC_PATH}
-  DEPENDS minilua ${DASM_PATH} ${CMAKE_CURRENT_BINARY_DIR}/luajit.h)
+  ARGS -o ${BUILDVM_ARCH_H}
+       ${VM_DASC_PATH}
+  DEPENDS minilua ${DASM_PATH} ${VM_DASC_PATH}
+)
 add_custom_target(buildvm_arch_h ALL
   DEPENDS ${BUILDVM_ARCH_H}
 )
@@ -633,7 +636,7 @@ if("${LJ_DETECTED_ARCH}" STREQUAL "Loongarch64")
 endif()
 
 if (MSVC)
-  set_target_properties(luajit PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
+  set_target_properties(libluajit PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
 endif()
 
 set(luajit_headers
