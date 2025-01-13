@@ -426,15 +426,13 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
        ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
   DEPENDS ${LUAJIT_DIR}/src/luajit_rolling.h
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit_relver.txt
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
 )
 
 # Generate buildvm_arch.h
 add_custom_command(OUTPUT ${BUILDVM_ARCH_H}
   COMMAND ${HOST_WINE} ${MINILUA_PATH} ${DASM_PATH} ${DASM_FLAGS}
-  ARGS -o ${BUILDVM_ARCH_H}
-       ${VM_DASC_PATH}
-  DEPENDS minilua ${DASM_PATH} ${VM_DASC_PATH}
+          -o ${BUILDVM_ARCH_H} ${VM_DASC_PATH}
+  DEPENDS minilua ${DASM_PATH} ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
 )
 add_custom_target(buildvm_arch_h ALL
   DEPENDS ${BUILDVM_ARCH_H}
