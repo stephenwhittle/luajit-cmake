@@ -571,6 +571,31 @@ add_dependencies(libluajit
   buildvm
   lj_gen_headers
   lj_gen_folddef)
+
+if (VS_ANDROID)
+  add_custom_command(
+      OUTPUT lj_vm.o
+      COMMAND ${CMAKE_ASM_COMPILER} lj_vm.S -c --target=arm64 -g -o lj_vm.o
+      DEPENDS ${LJ_VM_S_PATH}
+      COMMENT "Compile lj_vm.S"
+  )
+
+  add_custom_target(lj_vm_vs_andro ALL
+    DEPENDS lj_vm.o
+  )
+  set_target_properties(lj_vm_vs_andro PROPERTIES FOLDER "ext/lib" PROJECT_LABEL "libluajit-lj_vm")
+
+  add_custom_command(
+    TARGET libluajit
+    POST_BUILD
+    COMMAND "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe" rus $<TARGET_FILE_DIR:libluajit>/libluajit.a lj_vm.o
+    COMMENT "Link lj_vm.o"
+  )
+
+  add_dependencies(libluajit
+    lj_vm_vs_andro)
+endif()
+
 target_include_directories(libluajit PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR})
