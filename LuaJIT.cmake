@@ -426,13 +426,17 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
        ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
   DEPENDS ${LUAJIT_DIR}/src/luajit_rolling.h
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit_relver.txt
+  DEPENDS minilua
+)
+add_custom_target(luajit_h
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
 )
 
 # Generate buildvm_arch.h
 add_custom_command(OUTPUT ${BUILDVM_ARCH_H}
   COMMAND ${HOST_WINE} ${MINILUA_PATH} ${DASM_PATH} ${DASM_FLAGS}
           -o ${BUILDVM_ARCH_H} ${VM_DASC_PATH}
-  DEPENDS minilua ${DASM_PATH} ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
+  DEPENDS minilua ${DASM_PATH}
 )
 add_custom_target(buildvm_arch_h ALL
   DEPENDS ${BUILDVM_ARCH_H}
@@ -453,7 +457,7 @@ endif()
 if(NOT CMAKE_CROSSCOMPILING)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/host/buildvm)
   set(BUILDVM_PATH $<TARGET_FILE:buildvm>)
-  add_dependencies(buildvm buildvm_arch_h)
+  add_dependencies(buildvm buildvm_arch_h luajit_h)
 else()
   set(BUILDVM_PATH ${CMAKE_CURRENT_BINARY_DIR}/buildvm/${BUILDVM_EXE})
 
@@ -468,6 +472,7 @@ else()
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR}/buildvm
     DEPENDS ${CMAKE_CURRENT_LIST_DIR}/host/buildvm/CMakeLists.txt
     DEPENDS buildvm_arch_h
+    DEPENDS luajit_h
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/buildvm)
 
   add_custom_target(buildvm ALL
