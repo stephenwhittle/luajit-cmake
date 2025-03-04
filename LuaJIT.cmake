@@ -383,6 +383,12 @@ endif()
 
 set(VM_DASC_PATH ${LJ_DIR}/vm_${DASM_ARCH}.dasc)
 
+if (MSVC)
+  # Workaround to avoid placing of executables into Debug/Release sub-directories
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
+endif()
+
 # Build the minilua for host platform
 if(NOT CMAKE_CROSSCOMPILING)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/host/minilua)
@@ -425,13 +431,18 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
        ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
   DEPENDS ${LUAJIT_DIR}/src/luajit_rolling.h
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit_relver.txt
+  DEPENDS minilua
+)
+add_custom_target(luajit_h
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit.h
 )
 
 # Generate buildvm_arch.h
 add_custom_command(OUTPUT ${BUILDVM_ARCH_H}
   COMMAND ${HOST_WINE} ${MINILUA_PATH} ${DASM_PATH} ${DASM_FLAGS}
           -o ${BUILDVM_ARCH_H} ${VM_DASC_PATH}
-  DEPENDS minilua ${DASM_PATH} ${CMAKE_CURRENT_BINARY_DIR}/luajit.h)
+  DEPENDS minilua ${DASM_PATH}
+)
 add_custom_target(buildvm_arch_h ALL
   DEPENDS ${BUILDVM_ARCH_H}
 )
@@ -451,7 +462,7 @@ endif()
 if(NOT CMAKE_CROSSCOMPILING)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/host/buildvm)
   set(BUILDVM_PATH $<TARGET_FILE:buildvm>)
-  add_dependencies(buildvm buildvm_arch_h)
+  add_dependencies(buildvm buildvm_arch_h luajit_h)
 else()
   set(BUILDVM_PATH ${CMAKE_CURRENT_BINARY_DIR}/buildvm/${BUILDVM_EXE})
 
@@ -466,6 +477,7 @@ else()
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR}/buildvm
     DEPENDS ${CMAKE_CURRENT_LIST_DIR}/host/buildvm/CMakeLists.txt
     DEPENDS buildvm_arch_h
+    DEPENDS luajit_h
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/buildvm)
 
   add_custom_target(buildvm ALL
@@ -569,6 +581,31 @@ add_dependencies(libluajit
   buildvm
   lj_gen_headers
   lj_gen_folddef)
+
+if (VS_ANDROID)
+  add_custom_command(
+      OUTPUT lj_vm.o
+      COMMAND ${CMAKE_ASM_COMPILER} lj_vm.S -c --target=arm64 -g -o lj_vm.o
+      DEPENDS ${LJ_VM_S_PATH}
+      COMMENT "Compile lj_vm.S"
+  )
+
+  add_custom_target(lj_vm_vs_andro ALL
+    DEPENDS lj_vm.o
+  )
+  set_target_properties(lj_vm_vs_andro PROPERTIES FOLDER "ext/lib" PROJECT_LABEL "libluajit-lj_vm")
+
+  add_custom_command(
+    TARGET libluajit
+    POST_BUILD
+    COMMAND "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe" rus $<TARGET_FILE_DIR:libluajit>/libluajit.a lj_vm.o
+    COMMENT "Link lj_vm.o"
+  )
+
+  add_dependencies(libluajit
+    lj_vm_vs_andro)
+endif()
+
 target_include_directories(libluajit PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR})
@@ -579,6 +616,10 @@ if(BUILD_SHARED_LIBS)
     set(LJ_DEFINITIONS ${LJ_DEFINITIONS}
       -DLUA_BUILD_AS_DLL -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS)
   endif()
+endif()
+
+if (MSVC)
+  set_target_properties(libluajit PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
 endif()
 
 if(LIBM_LIBRARIES)
@@ -649,6 +690,10 @@ if("${LJ_DETECTED_ARCH}" STREQUAL "Loongarch64")
   target_compile_options(libluajit PRIVATE "-fwrapv")
 endif()
 
+if (MSVC)
+  set_target_properties(libluajit PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_CURRENT_BINARY_DIR}>)
+endif()
+
 set(luajit_headers
   ${LJ_DIR}/lauxlib.h
   ${LJ_DIR}/lua.h
@@ -691,4 +736,6 @@ target_include_directories(luajit-header INTERFACE ${LJ_DIR})
 
 add_library(luajit::lib ALIAS libluajit)
 add_library(luajit::header ALIAS luajit-header)
-add_executable(luajit::lua ALIAS luajit)
+if (LUAJIT_BUILD_EXE)
+  add_executable(luajit::lua ALIAS luajit)
+endif()
